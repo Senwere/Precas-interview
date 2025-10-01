@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Interview Recorder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3ffce; /* Light, calming background */
+        }
+        .recording-indicator {
+            animation: pulse-red 1.5s infinite;
+        }
+        @keyframes pulse-red {
+            0%, 100% { background-color: #1ada08; } /* red-500 */
+            50% { background-color: #dc2626; } /* red-600 */
+        }
+        /* Style for the countdown overlay */
+        .countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+            z-index: 10;
+        }
+        /* Style for the visualizer canvas */
+        #audio-visualizer, #pretest-audio-visualizer {
+             display: block; 
+             height: 3.5rem; /* Increased height for better visibility */
+        }
+        /* Style for the Focus Nudge Indicator */
+        .focus-nudge {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            transition: background-color 0.3s;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Custom Progress Bar Styling for Optimal Range Coaching */
+        #progress-bar-container {
+            position: relative;
+            width: 100%;
+            height: 12px;
+            background-color: #e5e7eb; /* Base background (gray-200) */
+            border-radius: 9999px; /* rounded-full */
+            overflow: hidden;
+        }
+        #progress-bar-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            height: 12px;
+            /* Optimal range visualization (60s to 90s, assuming max 90s response time) */
+            /* We calculate the optimal range percentage in JS based on MAX_RESPONSE_SECONDS */
+            left: var(--optimal-start); 
+            width: var(--optimal-width); 
+            background-color: #bef264; /* lime-200 */
+            z-index: 1; 
+        }
+        #progress-bar {
+            position: relative;
+            z-index: 2;
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Card -->
+    <div class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl p-6 sm:p-10 border-4 border-lime-500">
+        
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800 text-center mb-6">
+            PreCas Interview Mock (16 Questions)
+        </h1>
+
+        <!-- Initial Setup Screen -->
+        <div id="setup-screen">
+            
+            <!-- SETTINGS SECTION -->
+            <div class="mb-8 p-6 bg-lime-100 rounded-xl border border-lime-300 shadow-inner">
+                <h2 class="text-xl font-bold text-gray-700 mb-6">Interview Settings</h2>
+                
+                <!-- ROW 1: Country, Course, and University -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <!-- Country Selection -->
+                    <div class="text-left">
+                        <label for="country-select" class="block text-sm font-medium text-gray-600 mb-1">Intended Country of Study</label>
+                        <select id="country-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-lime-500 focus:border-lime-500 text-lg bg-white">
+                            <option value="United States">United States</option>
+                            <option value="United Kingdom" selected>United Kingdom</option>
+                            <option value="Canada">Canada</option>
+                            <option value="Australia">Australia</option>
+                            <option value="Germany">Germany</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Course Input -->
+                    <div class="text-left">
+                        <label for="course-input" class="block text-sm font-medium text-gray-600 mb-1">Chosen Course/Program</label>
+                        <input type="text" id="course-input" value="Master of Computer Science" placeholder="e.g., Master of Data Science"
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-lime-500 focus:border-lime-500 text-lg">
+                    </div>
+                    
+                    <!-- University Input -->
+                    <div class="text-left">
+                        <label for="university-input" class="block text-sm font-medium text-gray-600 mb-1">Intended University Name</label>
+                        <input type="text" id="university-input" value="University of London" placeholder="e.g., Imperial College London"
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-lime-500 focus:border-lime-500 text-lg">
+                    </div>
+                </div>
+
+
+                <!-- ROW 2: Time Settings -->
+                <div class="flex flex-col sm:flex-row justify-center gap-6">
+                    <!-- Max Response Time -->
+                    <div class="text-left w-full sm:w-1/2">
+                        <label for="max-time-input" class="block text-sm font-medium text-gray-600 mb-1">Max Response Time (seconds)</label>
+                        <input type="number" id="max-time-input" value="90" min="15" max="300" 
+                               class="w-full p-2 border border-gray-300 rounded-lg focus:ring-lime-500 focus:border-lime-500 text-lg">
+                        <p class="text-xs text-gray-500 mt-1">Maximum time per answer (usually 90-120s).</p>
+                    </div>
+
+                    <!-- Prep Time -->
+                    <div class="text-left w-full sm:w-1/2">
+                        <label for="prep-time-input" class="block text-sm font-medium text-gray-600 mb-1">Preparation Time (seconds)</label>
+                        <input type="number" id="prep-time-input" value="10" min="0" max="30" 
+                               class="w-full p-2 border border-gray-300 rounded-lg focus:ring-lime-500 focus:border-lime-500 text-lg">
+                        <p class="text-xs text-gray-500 mt-1">Time to think before recording starts.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- END SETTINGS SECTION -->
+            
+            <p class="text-lg text-gray-600 mb-6 text-center">You will be practicing with **16 fixed, high-stakes interview questions**.</p>
+            <button id="start-session-btn" class="w-full px-8 py-3 bg-lime-600 text-white font-semibold rounded-lg shadow-lg hover:bg-lime-700 transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-lime-300">
+                Proceed to Camera Check
+            </button>
+            <p id="setup-status" class="mt-4 text-red-500 font-medium text-center hidden">Waiting for camera permissions...</p>
+        </div>
+        
+        <!-- NEW: Pre-Test Screen -->
+        <div id="pretest-screen" class="hidden text-center">
+             <h2 class="text-2xl font-bold text-gray-800 mb-6">Step 1: Check Your Setup</h2>
+             <p class="text-gray-600 mb-4">Please confirm your camera and microphone are working correctly before starting the interview.</p>
+             
+             <!-- Video Preview and Mic Level -->
+             <div class="w-full relative bg-gray-900 rounded-xl overflow-hidden shadow-xl aspect-video mb-6">
+                <video id="pretest-video-preview" autoplay muted class="w-full h-full object-cover"></video>
+                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gray-800/80">
+                    <h3 class="text-base font-extrabold text-white text-center mb-1">Microphone Level Test: Speak Now</h3>
+                    <canvas id="pretest-audio-visualizer" class="w-full rounded-lg bg-gray-700 border border-gray-600"></canvas>
+                </div>
+             </div>
+             
+             <p id="pretest-status" class="text-sm text-green-600 mb-6 font-medium">Camera and Mic loaded successfully. Ready to proceed!</p>
+             
+             <button id="confirm-setup-btn" class="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
+                 Start 16-Question Interview
+             </button>
+        </div>
+
+
+        <!-- Question & Video Screen -->
+        <div id="session-screen" class="hidden">
+            
+            <!-- Video and Question Display -->
+            <div class="flex flex-col lg:flex-row gap-6">
+                
+                <!-- Video Preview -->
+                <div class="w-full lg:w-1/2 relative bg-gray-900 rounded-xl overflow-hidden shadow-xl aspect-video">
+                    <video id="video-preview" autoplay muted class="w-full h-full object-cover"></video>
+                    
+                    <!-- Question Text Overlay on Video -->
+                    <div id="question-overlay" class="absolute bottom-0 left-0 right-0 p-3 sm:p-4 bg-black/50 text-white text-base sm:text-xl font-bold text-center z-5 shadow-lg">
+                        <!-- Question text will be inserted here -->
+                    </div>
+
+                    <!-- Countdown Overlay (Hidden initially) -->
+                    <div id="countdown-overlay" class="countdown-overlay hidden">
+                        <p class="text-xl font-medium mb-4">Preparation Time</p>
+                        <p id="countdown-timer" class="text-8xl font-bold">10</p>
+                    </div>
+
+                    <!-- Recording Status Overlay -->
+                    <div id="recording-status" class="absolute top-3 left-3 flex items-center bg-gray-800/70 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md opacity-0 transition duration-300">
+                        <!-- Red Dot Indicator -->
+                        <span id="recording-dot" class="w-3 h-3 rounded-full mr-2 recording-indicator"></span>
+                        REC
+                    </div>
+
+                    <!-- Live Focus Nudge Indicator (Prominent placement near video) -->
+                    <div class="absolute top-3 right-3 flex items-center bg-gray-800/70 px-3 py-1 rounded-full text-sm font-medium opacity-0 transition duration-300" id="focus-nudge-container">
+                        <span id="focus-nudge-dot" class="focus-nudge mr-2 bg-gray-500"></span>
+                        Mic & Focus
+                    </div>
+                </div>
+
+                <!-- Question, Timer, and Controls -->
+                <div class="w-full lg:w-1/2 p-4 flex flex-col justify-between bg-lime-50 rounded-xl border border-lime-200">
+                    <div>
+                        <!-- Question Header -->
+                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider" id="question-counter">Question 1 of 16</p>
+                        <h2 class="text-2xl font-bold text-gray-800 mt-2" id="question-text">Loading fixed question set...</h2>
+
+                        <!-- Updated Mic Level Section -->
+                        <div class="mt-6 p-3 bg-white rounded-xl shadow-lg border border-lime-300">
+                            <h3 class="text-lg font-extrabold text-lime-700 text-center mb-1">Microphone Level</h3>
+                            <!-- Audio Visualizer Canvas -->
+                            <canvas id="audio-visualizer" class="w-full rounded-lg bg-gray-200 border border-gray-300"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Pacing and Progress -->
+                    <div class="mt-8">
+                        <p id="pacing-advice" class="text-sm font-medium text-gray-600 text-center mb-2">Aim for the green zone (60-90 seconds) for comprehensive answers.</p>
+                        
+                        <!-- Progress Bar for time limit (NO TIMER TEXT) -->
+                        <div id="progress-bar-container" class="h-3 mb-4 overflow-hidden">
+                            <div id="progress-bar" class="bg-blue-500 h-full transition-all duration-100 ease-linear" style="width: 0%"></div>
+                        </div>
+
+                        <!-- Concise Control Buttons Container -->
+                        <div id="controls-container" class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                            
+                            <!-- Primary Action: Next Question -->
+                            <button id="next-question-btn" class="col-span-2 sm:col-span-1 px-4 py-3 bg-blue-600 text-white text-base font-bold rounded-xl shadow-md hover:bg-blue-700 transition duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300" disabled>
+                                Wait...
+                            </button>
+                            
+                            <!-- Secondary Action: Pause/Resume -->
+                            <button id="pause-resume-btn" class="px-4 py-3 bg-amber-500 text-gray-900 text-base font-bold rounded-xl shadow-md hover:bg-amber-600 transition duration-300 focus:outline-none focus:ring-4 focus:ring-amber-300 hidden" disabled>
+                                Pause
+                            </button>
+                            
+                            <!-- Utility Action: Background Blur Toggle -->
+                            <button id="blur-toggle-btn" class="px-4 py-3 bg-gray-500 text-white text-base font-bold rounded-xl shadow-md hover:bg-gray-600 transition duration-300 focus:outline-none focus:ring-4 focus:ring-gray-300 hidden" disabled>
+                                Blur
+                            </button>
+                        </div>
+                        <!-- Added an element to replace the need for alert() -->
+                        <div id="message-box" class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg hidden text-sm" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results-screen" class="hidden text-center p-8 bg-green-50 rounded-xl">
+            <h2 class="text-3xl font-bold text-green-700 mb-4">Session Complete! 🎉</h2>
+            <p class="text-lg text-gray-700 mb-6">Review your answers and get **AI Feedback** below.</p>
+            
+            <div id="download-links" class="space-y-6 max-h-[70vh] overflow-y-auto p-4 bg-white border border-green-200 rounded-lg shadow-inner">
+                <!-- Individual download links and video players will be inserted here -->
+            </div>
+
+            <!-- MERGED DOWNLOAD SECTION -->
+            <div class="mt-8 pt-4 border-t border-gray-300">
+                <h3 class="text-xl font-bold text-gray-700 mb-3">Download Full Session</h3>
+                <button id="download-merged-btn" class="px-8 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow-lg hover:bg-purple-700 transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300">
+                    Download All Videos as One MP4 File
+                </button>
+                <p class="mt-2 text-xs text-red-500 max-w-lg mx-auto">
+                    Note: The videos are recorded in **MP4** format (if supported). Merging segments in the browser is experimental.
+                </p>
+            </div>
+            <!-- END MERGED DOWNLOAD SECTION -->
+
+            <p class="mt-6 text-sm text-gray-500">Tip: Use the individual download links if merged playback is inconsistent.</p>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Helper function for showing non-alert messages
+        const showMessage = (text, type = 'error', duration = 5000) => {
+            const msgBox = document.getElementById('message-box');
+            msgBox.textContent = text;
+            msgBox.className = 'mt-4 p-3 rounded-lg block text-sm';
+            if (type === 'error') {
+                msgBox.classList.add('bg-red-100', 'border', 'border-red-400', 'text-red-700');
+            } else if (type === 'info') {
+                 msgBox.classList.add('bg-blue-100', 'border', 'border-blue-400', 'text-blue-700');
+            } else { // success
+                msgBox.classList.add('bg-green-100', 'border', 'border-green-400', 'text-green-700');
+            }
+            // Ensure visibility before starting timeout
+            msgBox.classList.remove('hidden');
+            setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, duration);
+        };
+
+
+        // --- Configuration and State ---
+        let QUESTIONS = []; 
+        
+        let MAX_RESPONSE_SECONDS = 90; 
+        let PREP_COUNTDOWN_SECONDS = 10; 
+        let OPTIMAL_START_SECONDS = 60; // Start of the green zone
+        let OPTIMAL_END_SECONDS = 90;   // End of the green zone / MAX_RESPONSE_SECONDS
+        let isBlurred = false; 
+
+        // Audio Visualizer Variables
+        let audioContext;
+        let analyser;
+        let source;
+        let animationFrameId;
+
+        // API Configuration for AI Feedback
+        const apiKey = ""; 
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        let currentQuestionIndex = 0;
+        let mediaRecorder;
+        let videoStream = null;
+        let recordedChunks = [];
+        let allRecordings = []; 
+        let timerInterval;
+        let isRecording = false;
+        let currentSeconds = 0; 
+        
+        // Visualizer Contexts
+        let sessionVisualizerCtx; 
+        let pretestVisualizerCtx;
+        
+        // --- DOM Elements ---
+        const setupScreen = document.getElementById('setup-screen');
+        const pretestScreen = document.getElementById('pretest-screen'); // NEW
+        const sessionScreen = document.getElementById('session-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const startSessionBtn = document.getElementById('start-session-btn');
+        const confirmSetupBtn = document.getElementById('confirm-setup-btn'); // NEW
+        const setupStatus = document.getElementById('setup-status');
+        
+        // Settings elements
+        const maxTimeInput = document.getElementById('max-time-input');
+        const prepTimeInput = document.getElementById('prep-time-input');
+        const countrySelect = document.getElementById('country-select'); 
+        const courseInput = document.getElementById('course-input');     
+        const universityInput = document.getElementById('university-input'); 
+        
+        // Pre-test elements
+        const pretestVideoPreview = document.getElementById('pretest-video-preview');
+        const pretestVisualizerCanvas = document.getElementById('pretest-audio-visualizer');
+
+        // Session elements
+        const videoPreview = document.getElementById('video-preview');
+        const countdownOverlay = document.getElementById('countdown-overlay');
+        const countdownTimerEl = document.getElementById('countdown-timer');
+        const recordingStatus = document.getElementById('recording-status');
+        const questionOverlay = document.getElementById('question-overlay'); 
+        const questionCounter = document.getElementById('question-counter');
+        const questionText = document.getElementById('question-text');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const pauseResumeBtn = document.getElementById('pause-resume-btn'); 
+        const blurToggleBtn = document.getElementById('blur-toggle-btn'); 
+        const progressBarContainer = document.getElementById('progress-bar-container'); // NEW
+        const progressBar = document.getElementById('progress-bar'); 
+        const focusNudgeContainer = document.getElementById('focus-nudge-container'); 
+        const focusNudgeDot = document.getElementById('focus-nudge-dot'); 
+        const pacingAdvice = document.getElementById('pacing-advice');
+        
+        // Visualizer elements
+        const sessionVisualizerCanvas = document.getElementById('audio-visualizer');
+        
+        // Results elements
+        const downloadLinks = document.getElementById('download-links');
+        const downloadMergedBtn = document.getElementById('download-merged-btn');
+
+
+        // --- Dynamic Question Generation ---
+        const getDynamicQuestions = (selectedCountry, selectedUniversity, selectedCourse) => { 
+            const dynamicCountryName = selectedCountry.toUpperCase(); 
+            
+            const universityPlaceholder = selectedUniversity.trim() || "THE UNIVERSITY";
+            const q4Text = `4. WHY DID YOU CHOOSE ${universityPlaceholder.toUpperCase()} (What are the specific features, faculty, or facilities that attracted you to this institution?)`;
+
+            const coursePlaceholder = selectedCourse.trim() || "YOUR COURSE OF STUDY";
+            const q5Text = `5. WHY DID YOU CHOOSE ${coursePlaceholder.toUpperCase()} (How does this specific curriculum benefit your future goals compared to similar ones?)`;
+
+
+            const dynamicQuestions = [
+                "1. INTRODUCE YOURSELF (Tell us a bit about your background, education, and current situation.)",
+                `2. WHY DID YOU CHOOSE THE ${dynamicCountryName} (Why this country over others?)`, 
+                "3. DID YOU CONSIDER OTHER STUDY DESTINATIONS (Why did you choose this country/university over the others you considered?)",
+                q4Text, 
+                q5Text, 
+                "6. WHAT ARE YOUR FUTURE PROSPECTS (What are your short-term and long-term career goals after graduation?)",
+                "7. TELL US ABOUT YOUR STUDY GAP (If applicable, explain any gaps in your academic or professional history.)",
+                "8. WHERE IS YOUR UNIVERSITY LOCATED (Do you know the city/region and have you researched the location?)",
+                "9. WHAT IS YOUR EXPECTED LIVING EXPENSE? (Demonstrate you have a realistic understanding of the cost of living.)",
+                "10. WILL YOU BE TRAVELLING WITH DEPENDANTS? (If yes, what arrangements have you made for them?)",
+                "11. HAVE YOU HAD ANY VISA REFUSALS (If yes, what were the reasons and how have you addressed them?)",
+                "12. WHO IS SPONSORING YOUR STUDIES (Detail your financial sponsor(s) and their ability to cover your costs.)",
+                "13. Tell us something about your chosen country of study (Show cultural and general knowledge of the country.)",
+                "14. How will you deal with home sickness",
+                "15. Do you know your work limitations as a student in this country",
+                "16. Have you sorted out your accomodation issues? (Demonstrate readiness and planning for arrival.)",
+            ];
+            
+            return dynamicQuestions;
+        };
+
+
+        // --- Utility Functions for AI Integration (Placeholder/Structure remains the same) ---
+        // (blobToBase64, fetchWithBackoff, getAiFeedback, formatMetrics functions remain as they were in the previous version)
+        
+        const blobToBase64 = (blob) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        };
+        
+        async function fetchWithBackoff(url, options, maxRetries = 5, delay = 1000) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) {
+                        return response;
+                    }
+                    if (response.status === 429 || response.status >= 500) {
+                        console.warn(`API request failed with status ${response.status}. Retrying in ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; 
+                        continue;
+                    }
+                    throw new Error(`API error: ${response.statusText} (${response.status})`);
+                } catch (error) {
+                    console.error('Fetch attempt failed:', error);
+                    if (i === maxRetries - 1) throw error; 
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; 
+                }
+            }
+        }
+        
+        const getAiFeedback = async (question, videoBlob) => {
+            
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    transcript: { type: "STRING", description: "The complete, verbatim transcript of the candidate's video response." },
+                    metrics: {
+                        type: "OBJECT",
+                        properties: {
+                            paceWPM: { type: "NUMBER", description: "Estimated speaking speed in Words Per Minute (WPM)." },
+                            fillerWords: { type: "STRING", description: "List of identified filler words (e.g., 'um', 'like', 'ah') and their counts, e.g., 'um: 5, like: 2'." },
+                            eyeContactScore: { type: "NUMBER", description: "Estimated percentage (0-100) of time maintaining eye contact with the camera." },
+                            silenceGapsAvgSec: { type: "NUMBER", description: "Average duration in seconds of significant pauses (silence gaps > 1s)." }
+                        },
+                        required: ["paceWPM", "fillerWords", "eyeContactScore", "silenceGapsAvgSec"]
+                    },
+                    clarityAndStructure: { type: "STRING", description: "Qualitative feedback on clarity, structure, and use of methods like STAR. Use bullet points." },
+                    contentRelevance: { type: "STRING", description: "Qualitative feedback on content depth, relevance, and example strength. Use bullet points." },
+                    deliveryAndConfidence: { type: "STRING", description: "Qualitative feedback on tone, body language, and overall confidence. Use bullet points." }
+                },
+                required: ["transcript", "metrics", "clarityAndStructure", "contentRelevance", "deliveryAndConfidence"]
+            };
+
+            try {
+                const base64Data = await blobToBase64(videoBlob);
+                
+                const systemPrompt = "You are an expert interview coach and analyst. Analyze the video response (audio, visual, and content) to the interview question. Calculate the required metrics and provide qualitative feedback in the specified format.";
+                
+                const userQuery = `The candidate was asked the following interview question: "${question}". Provide a full analysis, including the transcript, quantitative metrics, and qualitative feedback suitable for a visa interview preparation.`;
+
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: userQuery },
+                            {
+                                inlineData: {
+                                    mimeType: videoBlob.type, 
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }],
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: responseSchema
+                    }
+                };
+                
+                const response = await fetchWithBackoff(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (!jsonText) {
+                    console.error("API response lacked JSON content:", result);
+                    throw new Error("Model failed to return structured JSON data.");
+                }
+
+                const feedbackData = JSON.parse(jsonText);
+                return feedbackData;
+
+            } catch (error) {
+                console.error("AI Feedback Generation failed:", error);
+                return { error: `Analysis failed. Error: ${error.message}. Please try again.` };
+            }
+        };
+
+        const formatMetrics = (metrics) => {
+            const items = [
+                { label: "Pace (WPM)", value: `${metrics.paceWPM || 'N/A'}`, color: 'blue' },
+                { label: "Eye Contact Score", value: `${metrics.eyeContactScore || 'N/A'}%`, color: 'purple' },
+                { label: "Filler Words", value: metrics.fillerWords || 'N/A', color: 'red' },
+                { label: "Avg. Silence Gap", value: `${metrics.silenceGapsAvgSec || 'N/A'}s`, color: 'orange' },
+            ];
+
+            return `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center my-4">
+                    ${items.map(item => `
+                        <div class="p-3 rounded-lg shadow-inner bg-white border border-${item.color}-200">
+                            <p class="text-xs font-medium text-gray-500 uppercase">${item.label}</p>
+                            <p class="text-xl font-bold text-${item.color}-700 mt-1">${item.value}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        };
+        // --- End AI Utility Functions ---
+
+
+        // --- Visualizer Functions (Shared logic for pretest and session) ---
+        
+        const initVisualizers = () => {
+             sessionVisualizerCtx = sessionVisualizerCanvas.getContext('2d');
+             pretestVisualizerCtx = pretestVisualizerCanvas.getContext('2d');
+        }
+        
+        const stopVisualizer = (ctx, canvas) => {
+             if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (ctx && canvas) {
+                // Reset canvas to grey background
+                ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+                ctx.fillStyle = '#e5e7eb'; 
+                ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+            }
+             // Hide the focus nudge indicator (only present in session screen)
+            if (focusNudgeContainer) {
+                 focusNudgeContainer.classList.add('opacity-0');
+            }
+        }
+        
+        const drawVisualizer = (isPretest = false) => {
+            if (!analyser || !audioContext) {
+                 stopVisualizer(sessionVisualizerCtx, sessionVisualizerCanvas);
+                 return;
+            }
+            
+            const canvas = isPretest ? pretestVisualizerCanvas : sessionVisualizerCanvas;
+            const ctx = isPretest ? pretestVisualizerCtx : sessionVisualizerCtx;
+
+            if (!ctx || !canvas) return;
+            
+            // Only draw if we are in the pretest or actively recording
+            if (isPretest || isRecording) {
+                 animationFrameId = requestAnimationFrame(() => drawVisualizer(isPretest));
+            } else {
+                 stopVisualizer(ctx, canvas);
+                 return;
+            }
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+            }
+            const averageVolume = sum / bufferLength;
+
+            // --- Update Focus Nudge Indicator (Only during active recording session) ---
+            if (!isPretest) {
+                const dot = focusNudgeDot;
+                dot.classList.remove('bg-red-500', 'bg-amber-500', 'bg-green-500', 'bg-gray-500');
+
+                if (averageVolume > 20) {
+                    dot.classList.add('bg-green-500');
+                } else if (averageVolume > 5) {
+                    dot.classList.add('bg-amber-500');
+                } else {
+                    dot.classList.add('bg-red-500');
+                }
+                focusNudgeContainer.classList.remove('opacity-0');
+            }
+            // --- End Focus Nudge Update ---
+
+
+            // --- Draw Visualizer Bars ---
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const bgColor = isPretest ? '#374151' : '#e5e7eb'; // gray-700 or gray-200
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = bgColor; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const subsetLength = 50; 
+            const barWidth = (canvas.width / subsetLength) - 1; 
+            let x = 0;
+            const heightMultiplier = canvas.height / 256;
+
+            for(let i = 0; i < subsetLength; i++) {
+                const value = dataArray[i];
+                const barHeight = value * heightMultiplier;
+                
+                const hue = 120 - (value * 0.5); 
+                ctx.fillStyle = `hsl(${hue}, 80%, 65%)`;
+                
+                ctx.fillRect(
+                    x, 
+                    canvas.height - barHeight, 
+                    barWidth, 
+                    barHeight
+                );
+
+                x += barWidth + 1; 
+            }
+        };
+        
+        // --- Timer Functions ---
+        
+        // NEW: Function to update the progress bar's color based on pacing
+        const updateProgressBarAppearance = (progressPercentage) => {
+            progressBar.classList.remove('bg-red-500', 'bg-green-500', 'bg-blue-500');
+
+            if (currentSeconds >= OPTIMAL_END_SECONDS) {
+                // Too long / Hit max time
+                progressBar.classList.add('bg-red-500');
+                pacingAdvice.classList.add('text-red-600', 'font-bold');
+            } else if (currentSeconds >= OPTIMAL_START_SECONDS) {
+                // Optimal zone
+                progressBar.classList.add('bg-green-500');
+                pacingAdvice.classList.remove('text-red-600', 'font-bold');
+                pacingAdvice.classList.add('text-green-600', 'font-bold');
+            } else {
+                // Too short / Initial phase
+                progressBar.classList.add('bg-blue-500');
+                 pacingAdvice.classList.remove('text-red-600', 'font-bold', 'text-green-600');
+            }
+            
+            progressBar.style.width = `${Math.min(100, progressPercentage)}%`;
+        };
+        
+        const startTimer = () => {
+            clearInterval(timerInterval); 
+
+            timerInterval = setInterval(() => {
+                currentSeconds++;
+                
+                const progressPercentage = (currentSeconds / MAX_RESPONSE_SECONDS) * 100;
+                
+                // Update progress bar visual styling based on time
+                updateProgressBarAppearance(progressPercentage);
+                
+                if (currentSeconds >= MAX_RESPONSE_SECONDS) {
+                    stopTimer();
+                    showMessage("Time's up! Moving to the next question.", 'info', 3000);
+                    handleNextQuestion(true); 
+                }
+            }, 1000);
+        };
+
+        const stopTimer = () => {
+            clearInterval(timerInterval);
+            progressBar.style.width = '0%';
+             // Reset to blue for the next question
+            progressBar.classList.remove('bg-red-500', 'bg-green-500');
+            progressBar.classList.add('bg-blue-500');
+            pacingAdvice.classList.remove('text-red-600', 'font-bold', 'text-green-600');
+        };
+
+        const pauseTimer = () => {
+            clearInterval(timerInterval);
+        }
+        
+        const startCountdown = () => {
+            if (PREP_COUNTDOWN_SECONDS === 0) {
+                 return Promise.resolve();
+            }
+
+            return new Promise(resolve => {
+                countdownOverlay.classList.remove('hidden');
+                questionOverlay.classList.add('hidden');
+                let count = PREP_COUNTDOWN_SECONDS;
+                countdownTimerEl.textContent = count;
+
+                const countdownInterval = setInterval(() => {
+                    count--;
+                    countdownTimerEl.textContent = count;
+
+                    if (count === 0) {
+                        clearInterval(countdownInterval);
+                        countdownOverlay.classList.add('hidden');
+                        questionOverlay.classList.remove('hidden');
+                        resolve();
+                    }
+                }, 1000);
+            });
+        };
+
+        // --- Background Blur Feature ---
+        const toggleBackgroundBlur = async () => {
+            if (!videoStream) return;
+            
+            const videoTrack = videoStream.getVideoTracks()[0];
+            if (!videoTrack) {
+                showMessage("Video track not found.", 'error');
+                return;
+            }
+            
+            const newBlurState = !isBlurred;
+            
+            try {
+                if (!('backgroundBlur' in videoTrack.getCapabilities())) {
+                    blurToggleBtn.disabled = true;
+                    blurToggleBtn.textContent = 'Blur NOT Supported';
+                    showMessage("Background blur is not supported by your browser or device.", 'error', 8000);
+                    return;
+                }
+                
+                await videoTrack.applyConstraints({ advanced: [{ backgroundBlur: newBlurState }] });
+                
+                isBlurred = newBlurState;
+
+                blurToggleBtn.textContent = isBlurred ? 'Clear' : 'Blur';
+                blurToggleBtn.classList.toggle('bg-gray-500', !isBlurred);
+                blurToggleBtn.classList.toggle('bg-lime-600', isBlurred);
+                
+                showMessage(isBlurred ? "Background blur is now enabled." : "Background blur is now disabled.", 'info', 3000);
+                
+            } catch (err) {
+                console.error("Failed to apply background blur constraint:", err);
+                showMessage("Error applying background blur. Feature may not be fully supported.", 'error', 5000);
+            }
+        };
+
+        // --- Media Recording and Session Flow ---
+
+        const startSetupFlow = async () => {
+            // 1. Read and validate settings
+            const maxTime = parseInt(maxTimeInput.value, 10);
+            const prepTime = parseInt(prepTimeInput.value, 10);
+            const selectedCountry = countrySelect.value.trim(); 
+            const selectedCourse = courseInput.value.trim();     
+            const selectedUniversity = universityInput.value.trim(); 
+            
+            if (isNaN(maxTime) || maxTime < 15 || maxTime > 300) {
+                showMessage("Please enter a valid Max Response Time (15-300 seconds).", 'error');
+                return;
+            }
+            if (isNaN(prepTime) || prepTime < 0 || prepTime > 30) {
+                showMessage("Please enter a valid Preparation Time (0-30 seconds).", 'error');
+                return;
+            }
+            if (selectedCountry.length < 2) {
+                 showMessage("Please select a valid country of study.", 'error');
+                return;
+            }
+            
+            MAX_RESPONSE_SECONDS = maxTime;
+            PREP_COUNTDOWN_SECONDS = prepTime;
+            
+            // Calculate optimal time range (66% to 100% of max time, but not less than 60s)
+            OPTIMAL_END_SECONDS = MAX_RESPONSE_SECONDS;
+            OPTIMAL_START_SECONDS = Math.max(60, Math.round(MAX_RESPONSE_SECONDS * 0.66)); 
+            
+            // Set CSS variables for the progress bar visual guide
+            const optimalStartPercent = (OPTIMAL_START_SECONDS / MAX_RESPONSE_SECONDS) * 100;
+            const optimalWidthPercent = 100 - optimalStartPercent; // Since max is 100%
+            
+            progressBarContainer.style.setProperty('--optimal-start', `${optimalStartPercent}%`);
+            progressBarContainer.style.setProperty('--optimal-width', `${optimalWidthPercent}%`);
+            pacingAdvice.textContent = `Aim for the green zone (${OPTIMAL_START_SECONDS}-${OPTIMAL_END_SECONDS} seconds) for comprehensive answers.`;
+
+            // 2. GENERATE dynamic questions
+            QUESTIONS = getDynamicQuestions(selectedCountry, selectedUniversity, selectedCourse);
+            if (QUESTIONS.length === 0) {
+                 showMessage("Error: No interview questions were generated.", 'error', 10000);
+                 return;
+            }
+            
+            // 3. Move to the pre-test screen
+            setupScreen.classList.add('hidden');
+            pretestScreen.classList.remove('hidden');
+            
+            startSessionBtn.textContent = 'Starting Camera Check...';
+            await initCamera(); 
+            startSessionBtn.textContent = 'Proceed to Camera Check';
+        };
+
+        const initCamera = async () => {
+            
+            const maxMin = String(Math.floor(MAX_RESPONSE_SECONDS / 60));
+            const maxSec = String(MAX_RESPONSE_SECONDS % 60).padStart(2, '0');
+            
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                
+                // Attach stream to pre-test screen
+                pretestVideoPreview.srcObject = videoStream;
+                await new Promise(resolve => pretestVideoPreview.onloadedmetadata = resolve);
+
+                // Initialize Audio Context for Visualizer
+                if (videoStream.getAudioTracks().length > 0) {
+                    initVisualizers();
+                    stopVisualizer(pretestVisualizerCtx, pretestVisualizerCanvas); 
+
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    source = audioContext.createMediaStreamSource(videoStream);
+                    
+                    source.connect(analyser);
+                    analyser.fftSize = 256;
+                    
+                    // Start pre-test visualizer
+                    drawVisualizer(true); 
+                }
+
+                document.getElementById('pretest-status').textContent = `Camera & Mic loaded. Max response time is ${maxMin}:${maxSec}.`;
+
+            } catch (err) {
+                console.error("Error accessing media devices:", err);
+                document.getElementById('pretest-status').textContent = "Error: Could not access camera or microphone. Please check permissions.";
+                confirmSetupBtn.disabled = true;
+                showMessage("Error: Please grant camera and microphone permissions to start the interview.", 'error', 10000);
+            }
+        };
+        
+        const startInterview = () => {
+            // Stop pretest visualizer and transfer stream to session screen
+            stopVisualizer(pretestVisualizerCtx, pretestVisualizerCanvas);
+            pretestScreen.classList.add('hidden');
+            sessionScreen.classList.remove('hidden');
+            
+            // Attach stream to session screen
+            videoPreview.srcObject = videoStream;
+            
+            // Check for blur support and enable the button
+            const videoTrack = videoStream.getVideoTracks()[0];
+            if (videoTrack && ('backgroundBlur' in videoTrack.getCapabilities())) {
+                blurToggleBtn.classList.remove('hidden');
+                blurToggleBtn.disabled = false;
+                blurToggleBtn.textContent = 'Blur';
+            } else {
+                blurToggleBtn.classList.add('hidden');
+            }
+            
+            renderQuestion();
+        }
+
+        const startRecording = () => {
+            if (!videoStream) {
+                console.error("No stream available for recording.");
+                showMessage("Recording failed: Camera stream is unavailable.", 'error');
+                return;
+            }
+
+            recordedChunks = [];
+            currentSeconds = 0;
+            
+            let mimeType = 'video/mp4; codecs=avc1.424028,mp4a.40.2'; 
+            
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                 mimeType = 'video/webm; codecs=vp9,opus'; 
+            }
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                 mimeType = 'video/webm'; 
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(videoStream, { mimeType: mimeType });
+            } catch (error) {
+                console.error("MediaRecorder creation failed:", error);
+                showMessage(`Recording initialization failed. MimeType: ${mimeType}.`, 'error');
+                return;
+            }
+            
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType.split(';')[0] });
+                
+                const questionIndexForStorage = currentQuestionIndex; 
+                
+                allRecordings.push({ 
+                    question: QUESTIONS[questionIndexForStorage],
+                    blob: blob,
+                    index: questionIndexForStorage + 1
+                });
+                console.log(`Recording saved for Q${questionIndexForStorage + 1}. Blob size: ${blob.size}`);
+                isRecording = false;
+            };
+
+            mediaRecorder.onerror = (event) => {
+                 console.error("MediaRecorder Error:", event.error);
+                 showMessage(`Recording error occurred: ${event.error.name}.`, 'error');
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI updates
+            recordingStatus.classList.remove('opacity-0');
+            nextQuestionBtn.disabled = false;
+            nextQuestionBtn.textContent = 'STOP & NEXT';
+            pauseResumeBtn.classList.remove('hidden');
+            pauseResumeBtn.disabled = false;
+            pauseResumeBtn.textContent = 'Pause';
+            startTimer();
+            drawVisualizer(); // Start session visualizer and focus nudge
+            console.log("Recording started for question:", currentQuestionIndex + 1);
+        };
+
+        const stopRecording = () => {
+            if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
+                mediaRecorder.stop();
+                stopTimer();
+                stopVisualizer(sessionVisualizerCtx, sessionVisualizerCanvas); 
+                recordingStatus.classList.add('opacity-0');
+                pauseResumeBtn.classList.add('hidden');
+                questionOverlay.textContent = '';
+                isRecording = false;
+                focusNudgeContainer.classList.add('opacity-0'); // Ensure nudge is hidden
+                showMessage(`Question ${currentQuestionIndex + 1} saved successfully!`, 'info', 2000);
+            }
+        };
+
+        const handlePauseResume = () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.pause();
+                pauseTimer();
+                stopVisualizer(sessionVisualizerCtx, sessionVisualizerCanvas); 
+                recordingStatus.classList.add('opacity-0');
+                pauseResumeBtn.textContent = 'Resume';
+                pauseResumeBtn.classList.remove('bg-amber-500');
+                pauseResumeBtn.classList.add('bg-green-500', 'text-white');
+                nextQuestionBtn.disabled = true;
+                showMessage("Recording paused.", 'info', 2000);
+            } else if (mediaRecorder && mediaRecorder.state === 'paused') {
+                mediaRecorder.resume();
+                startTimer(); 
+                drawVisualizer();
+                recordingStatus.classList.remove('opacity-0');
+                pauseResumeBtn.textContent = 'Pause';
+                pauseResumeBtn.classList.add('bg-amber-500');
+                pauseResumeBtn.classList.remove('bg-green-500', 'text-white');
+                nextQuestionBtn.disabled = false;
+                showMessage("Recording resumed.", 'info', 2000);
+            }
+        };
+
+        const handleNextQuestion = (timedOut = false) => {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                if (!timedOut) {
+                    currentQuestionIndex++;
+                    renderQuestion();
+                }
+                return;
+            }
+            
+            stopRecording();
+
+            nextQuestionBtn.disabled = true;
+            nextQuestionBtn.textContent = 'Saving...';
+            pauseResumeBtn.classList.add('hidden');
+
+
+            setTimeout(() => {
+                currentQuestionIndex++;
+                renderQuestion(); 
+            }, 750); 
+        };
+
+        const renderQuestion = async () => {
+            if (currentQuestionIndex >= QUESTIONS.length) {
+                sessionScreen.classList.add('hidden');
+                resultsScreen.classList.remove('hidden');
+                displayResults();
+                return;
+            }
+            
+            questionCounter.textContent = `Question ${currentQuestionIndex + 1} of ${QUESTIONS.length}`;
+            
+            const currentQuestion = QUESTIONS[currentQuestionIndex];
+            questionText.textContent = currentQuestion;
+            questionOverlay.textContent = currentQuestion; 
+            
+            if (currentQuestionIndex === QUESTIONS.length - 1) {
+                nextQuestionBtn.textContent = 'FINISH';
+            } else {
+                 nextQuestionBtn.textContent = 'STOP & NEXT';
+            }
+            
+            nextQuestionBtn.disabled = true;
+            nextQuestionBtn.textContent = 'Preparing...';
+            pauseResumeBtn.classList.add('hidden');
+            
+            await startCountdown();
+
+            startRecording(); 
+        };
+        
+        
+        // --- Display Results & Merging (Same as previous version) ---
+
+        const displayResults = () => {
+            downloadLinks.innerHTML = ''; 
+
+            if (allRecordings.length === 0) {
+                downloadLinks.innerHTML = '<p class="text-gray-500">No successful recordings were captured.</p>';
+                downloadMergedBtn.disabled = true;
+                return;
+            }
+            
+            downloadMergedBtn.disabled = false;
+
+
+            allRecordings.forEach((recording) => {
+                const videoURL = URL.createObjectURL(recording.blob);
+                
+                const linkDiv = document.createElement('div');
+                linkDiv.className = 'bg-gray-100 p-4 rounded-xl flex flex-col gap-3 shadow-md border-2 border-lime-300';
+
+                const title = document.createElement('p');
+                title.className = 'text-base font-semibold text-gray-800 max-w-full text-left';
+                title.textContent = recording.question;
+
+                const videoPlayer = document.createElement('video');
+                videoPlayer.controls = true;
+                videoPlayer.src = videoURL;
+                videoPlayer.className = 'w-full rounded-lg shadow-inner bg-black';
+
+                // AI Feedback Button and Area
+                const feedbackContainer = document.createElement('div');
+                feedbackContainer.className = 'mt-3';
+                
+                const feedbackButton = document.createElement('button');
+                feedbackButton.textContent = 'Get AI Feedback & Analysis';
+                feedbackButton.className = 'w-full px-3 py-2 bg-violet-600 text-white text-sm font-semibold rounded-lg hover:bg-violet-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-violet-300';
+                
+                const feedbackArea = document.createElement('div');
+                feedbackArea.id = `feedback-q${recording.index}`;
+                feedbackArea.className = 'mt-4 p-4 bg-violet-50 border-2 border-violet-200 rounded-lg text-left text-sm hidden';
+
+
+                feedbackButton.addEventListener('click', async () => {
+                    feedbackButton.disabled = true;
+                    feedbackButton.textContent = 'Analyzing... This may take up to 30 seconds.';
+                    feedbackArea.classList.remove('hidden');
+                    
+                    feedbackArea.innerHTML = `<div class="flex items-center justify-center text-gray-600 py-4">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-violet-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 
+                        Generating Structured Feedback...
+                    </div>`;
+
+                    const feedback = await getAiFeedback(recording.question, recording.blob);
+
+                    if (feedback.error) {
+                        feedbackArea.innerHTML = `<p class="text-red-700 font-bold">${feedback.error}</p>`;
+                        feedbackButton.textContent = 'Analysis Failed (See Console)';
+                        return;
+                    }
+
+                    // --- Render the structured JSON feedback ---
+                    
+                    let htmlContent = '<div>';
+                    
+                    // 1. Metrics Card
+                    htmlContent += `<h3 class="text-lg font-bold text-violet-700 mb-2 border-b border-violet-300 pb-1">Delivery Metrics Scorecard</h3>`;
+                    htmlContent += formatMetrics(feedback.metrics);
+
+                    // 2. Qualitative Feedback
+                    htmlContent += `
+                        <h3 class="text-lg font-bold text-violet-700 mt-4 mb-2 border-b border-violet-300 pb-1">Qualitative Coaching</h3>
+                        <div class="space-y-4">
+                            <div><p class="font-semibold text-gray-700">Clarity and Structure:</p><p class="whitespace-pre-wrap mt-1">${feedback.clarityAndStructure}</p></div>
+                            <div><p class="font-semibold text-gray-700">Content Relevance and Depth:</p><p class="whitespace-pre-wrap mt-1">${feedback.contentRelevance}</p></div>
+                            <div><p class="font-semibold text-gray-700">Delivery and Confidence:</p><p class="whitespace-pre-wrap mt-1">${feedback.deliveryAndConfidence}</p></div>
+                        </div>
+                    `;
+
+                    // 3. Full Transcript
+                    htmlContent += `
+                        <h3 class="text-lg font-bold text-violet-700 mt-6 mb-2 border-b border-violet-300 pb-1">Full Transcript</h3>
+                        <div class="p-3 bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto">
+                            <p class="text-gray-700 font-mono text-xs whitespace-pre-wrap">${feedback.transcript}</p>
+                        </div>
+                    `;
+                    
+                    htmlContent += '</div>';
+                    
+                    feedbackArea.innerHTML = htmlContent;
+                    feedbackButton.textContent = 'Analysis Complete';
+                    // --- End rendering ---
+                });
+                
+                // Download Button Container
+                const actionContainer = document.createElement('div');
+                actionContainer.className = 'flex justify-end items-center mt-2';
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = videoURL;
+                downloadLink.download = `PreCas_Q${recording.index}_Answer.mp4`;
+                downloadLink.textContent = 'Download Video (.mp4)';
+                downloadLink.className = 'px-3 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 transition duration-200 focus:outline-none focus:ring-4 focus:ring-green-300';
+                
+                
+                actionContainer.appendChild(downloadLink);
+
+                linkDiv.appendChild(title);
+                linkDiv.appendChild(videoPlayer);
+                linkDiv.appendChild(feedbackButton); // Button above the feedback area
+                linkDiv.appendChild(feedbackArea); // Feedback area below the button
+                linkDiv.appendChild(actionContainer); // Download link at the bottom right
+                downloadLinks.appendChild(linkDiv);
+            });
+
+            // Stop all tracks to turn off the camera light
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => {
+                    if (track.stop) track.stop(); // Safe stop
+                });
+                videoPreview.srcObject = null;
+                stopVisualizer(sessionVisualizerCtx, sessionVisualizerCanvas); 
+            }
+            showMessage("Session saved successfully! Review your videos below.", 'success', 5000);
+        };
+
+        const mergeAllVideos = () => {
+            if (allRecordings.length === 0) {
+                showMessage("No recordings available to merge.", 'error');
+                return;
+            }
+
+            const allBlobs = allRecordings.map(r => r.blob);
+            
+            try {
+                const mergedBlob = new Blob(allBlobs, { type: 'video/mp4' });
+                const mergedURL = URL.createObjectURL(mergedBlob);
+                
+                const a = document.createElement('a');
+                a.href = mergedURL;
+                a.download = 'PreCas_Full_Interview_Session_Merged.mp4';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                URL.revokeObjectURL(mergedURL);
+
+                showMessage("Merged video download started. Check your downloads folder.", 'success');
+            } catch (error) {
+                console.error("Error during video merging:", error);
+                showMessage("Failed to merge videos. Please download them individually.", 'error');
+            }
+        };
+
+
+        // --- Event Listeners and Initialization ---
+        startSessionBtn.addEventListener('click', startSetupFlow);
+        confirmSetupBtn.addEventListener('click', startInterview); // NEW listener
+        nextQuestionBtn.addEventListener('click', () => handleNextQuestion(false));
+        downloadMergedBtn.addEventListener('click', mergeAllVideos); 
+        pauseResumeBtn.addEventListener('click', handlePauseResume); 
+        blurToggleBtn.addEventListener('click', toggleBackgroundBlur); 
+
+        // Ensure canvas contexts are initialized on load
+        window.addEventListener('load', () => {
+            initVisualizers();
+            // Initial sizing for both canvases
+            sessionVisualizerCanvas.width = sessionVisualizerCanvas.offsetWidth;
+            sessionVisualizerCanvas.height = sessionVisualizerCanvas.offsetHeight;
+            pretestVisualizerCanvas.width = pretestVisualizerCanvas.offsetWidth;
+            pretestVisualizerCanvas.height = pretestVisualizerCanvas.offsetHeight;
+        });
+
+    </script>
+</body>
+</html>
